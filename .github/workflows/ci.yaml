@@ -1,0 +1,140 @@
+---
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request: ~
+  workflow_dispatch: ~
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Build Docker images
+        uses: docker/bake-action@v7
+        with:
+          pull: true
+          load: true
+          source: .
+          files: |
+            compose.yaml
+            compose.override.yaml
+          set: |
+            *.cache-from=type=gha,scope=${{github.ref}}
+            *.cache-from=type=gha,scope=refs/heads/main
+            *.cache-to=type=gha,scope=${{github.ref}},mode=max
+      - name: Start services
+        run: docker compose up --wait --no-build
+      - name: Check HTTP reachability
+        run: curl -v --fail-with-body http://localhost
+      # Uncomment when the homepage is configured, or change the path to check
+      # - name: Check HTTPS reachability
+      #   run: curl -v --insecure --fail-with-body https://localhost
+      - name: Check Mercure reachability
+        run: curl -vI --insecure --fail-with-body https://localhost/.well-known/mercure?topic=test
+      - name: Create test database
+        run: docker compose exec -T php php bin/console doctrine:database:create --env=test --if-not-exists
+      - name: Run migrations
+        run: docker compose exec -T php php bin/console doctrine:migrations:migrate --env=test --no-interaction
+      - name: Run PHPUnit
+        run: docker compose exec -T php php bin/phpunit
+      - name: Doctrine schema validation
+        run: docker compose exec -T php php bin/console doctrine:schema:validate --env=test
+      - name: Check FizzBuzz API
+        run: >-
+          curl --fail-with-body --insecure
+          'https://localhost/api/fizzbuzz?int1=3&int2=5&limit=15&str1=fizz&str2=buzz'
+  lint:
+    name: Lint GitHub Actions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Validate GitHub Actions workflows
+        run: >-
+          docker run --rm
+          -v "${GITHUB_WORKSPACE}:/repo"
+          -w /repo
+          rhysd/actionlint:latest
+          .github/workflows/ci.yaml
+
+  # Deployment FTPS désactivé temporairement.
+  # Pour le réactiver, supprimer les commentaires de ce job et configurer les
+  # secrets FTP_SERVER, FTP_USERNAME, FTP_PASSWORD et FTP_SERVER_DIR.
+  # deploy:
+  #   name: Deploy to production by FTP
+  #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  #   needs: [tests, lint]
+  #   runs-on: ubuntu-latest
+  #   environment: production
+  #   permissions:
+  #     contents: read
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v7
+  #       with:
+  #         persist-credentials: false
+  #
+  #     - name: Set up PHP
+  #       uses: shivammathur/setup-php@v2
+  #       with:
+  #         php-version: '8.5'
+  #         extensions: ctype, iconv
+  #         tools: composer:v2
+  #         coverage: none
+  #
+  #     - name: Install production dependencies
+  #       run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader --no-scripts
+  #
+  #     - name: Prepare FTP package
+  #       shell: bash
+  #       run: |
+  #         mkdir deploy
+  #         rsync -a \
+  #           --exclude='.git/' \
+  #           --exclude='.github/' \
+  #           --exclude='.devcontainer/' \
+  #           --exclude='tests/' \
+  #           --exclude='var/' \
+  #           --exclude='vendor/' \
+  #           --exclude='.env*' \
+  #           --exclude='compose*.yaml' \
+  #           --exclude='Dockerfile' \
+  #           --exclude='README.md' \
+  #           --exclude='phpunit.dist.xml' \
+  #           --exclude='*.instructions.md' \
+  #           ./ deploy/
+  #         cp -a vendor deploy/vendor
+  #         mkdir -p deploy/var/cache deploy/var/log deploy/var/share
+  #         touch deploy/var/.gitkeep
+  #
+  #     - name: Deploy package over FTPS
+  #       uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+  #       with:
+  #         server: ${{ secrets.FTP_SERVER }}
+  #         username: ${{ secrets.FTP_USERNAME }}
+  #         password: ${{ secrets.FTP_PASSWORD }}
+  #         protocol: ftps
+  #         port: 21
+  #         local-dir: ./deploy/
+  #         server-dir: ${{ secrets.FTP_SERVER_DIR }}
+  #         dangerous-clean-slate: false
+  #         log-level: minimal

@@ -1,0 +1,82 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Console FizzBuzz
+{% endblock %}
+
+{% block stylesheets %}
+	<link rel="stylesheet" href="{{ asset('css/app.css') }}">
+{% endblock %}
+
+{% block javascripts %}
+	<script src="{{ asset('js/app.js') }}" defer></script>
+{% endblock %}
+
+{% block body %}
+	<div class="app-shell">
+		<header class="topbar">
+			<a class="brand" href="/" aria-label="Accueil FizzBuzz API">
+				<span class="brand-mark">F</span>
+				<span>FizzBuzz API</span>
+			</a>
+			<nav class="nav-links" aria-label="Navigation principale">
+				<a href="/api/docs">Documentation</a>
+				<a href="/api/statistics/most-frequent" target="_blank" rel="noopener">Statistiques API</a>
+			</nav>
+		</header>
+
+		<main>
+			<section class="hero">
+				<p class="eyebrow">Console de démonstration · Symfony 8</p>
+				<h1>Donnez du rythme à vos nombres.</h1>
+				<p class="hero-intro">Composez une règle, générez une séquence et observez l'API remplacer les multiples par votre propre vocabulaire.</p>
+			</section>
+
+			<section class="workspace" aria-label="Console FizzBuzz">
+				<div class="panel form-panel">
+					<div class="panel-heading">
+						<h2>Créer une règle</h2>
+						<span>GET /api/fizzbuzz</span>
+					</div>
+					<form id="fizzbuzz-form">
+						<div class="field-grid">
+							<label>Diviseur 1
+								<input name="int1" type="number" min="1" value="3" required></label>
+							<label>Diviseur 2
+								<input name="int2" type="number" min="1" value="5" required></label>
+							<label class="full-field">Limite
+								<input name="limit" type="number" min="1" max="100000" value="30" required></label>
+							<label>Mot 1
+								<input name="str1" type="text" maxlength="100" value="fizz" required></label>
+							<label>Mot 2
+								<input name="str2" type="text" maxlength="100" value="buzz" required></label>
+						</div>
+						<div class="actions">
+							<button class="primary" type="submit">Générer la séquence</button>
+							<button class="secondary" id="stats-button" type="button">Voir les stats</button>
+						</div>
+						<p class="hint">Quand un nombre correspond aux deux diviseurs, les mots sont assemblés :
+							<strong id="combined-value">fizzbuzz</strong>.</p>
+						<p class="form-requirement">Tous les champs sont nécessaires pour interroger l'API.</p>
+					</form>
+				</div>
+
+				<div class="panel result-panel">
+					<div class="panel-heading">
+						<h2>Résultat en direct</h2>
+						<span id="result-count">En attente</span>
+					</div>
+					<div class="result-content">
+						<p class="status" id="status" role="status">Définissez une règle puis générez votre première séquence.</p>
+						<div class="result-grid" id="result-grid">
+							<div class="empty-state">Vos valeurs générées<br>apparaîtront ici.</div>
+						</div>
+						<div class="stats-box" id="stats-box">
+							<h3>Requête la plus fréquente</h3>
+							<div class="stats-values" id="stats-values"></div>
+						</div>
+					</div>
+				</div>
+			</section>
+		</main>
+	</div>
+{% endblock %}
