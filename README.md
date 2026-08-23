@@ -57,6 +57,27 @@ L'application est ensuite disponible ici :
 
 En environnement local, le certificat HTTPS genere par Caddy peut necessiter une exception dans le navigateur.
 
+### Changer d'environnement avec Docker
+
+Le fichier `compose.override.yaml` active automatiquement l'image de developpement lorsque Docker Compose est lance sans option `-f`. Pour passer de la production au developpement :
+
+```powershell
+docker compose -f compose.yaml -f compose.prod.yaml down
+docker compose build
+docker compose up -d
+```
+
+Pour passer du developpement a la production, arreter d'abord les services de developpement puis utiliser explicitement le fichier Compose de production :
+
+```powershell
+docker compose down
+docker compose -f compose.yaml -f compose.prod.yaml build
+docker compose -f compose.yaml -f compose.prod.yaml up -d
+docker compose -f compose.yaml -f compose.prod.yaml exec php php bin/console doctrine:migrations:migrate --env=prod --no-interaction
+```
+
+Avant de demarrer la production, definir `APP_SECRET` et les autres variables de production dans l'environnement PowerShell ou dans un fichier `.env.local` non versionne. Les volumes Docker de production sont distincts des volumes de developpement. La commande `docker compose down -v` supprime les donnees de la base et ne doit etre utilisee que volontairement.
+
 ## Installation sans Docker
 
 Cette installation necessite PHP, Composer et PostgreSQL installes directement sur la machine.
@@ -118,6 +139,35 @@ Installer les assets API Platform :
 ```bash
 php bin/console assets:install public
 ```
+
+### Changer d'environnement sans Docker
+
+L'environnement Symfony est determine par `APP_ENV`. Pour passer du developpement a la production, arreter le serveur courant, modifier `.env.local` et lancer les commandes avec `APP_ENV=prod` :
+
+```dotenv
+APP_ENV=prod
+APP_SECRET=une-valeur-secrete
+DATABASE_URL="postgresql://app:mot_de_passe@127.0.0.1:5432/app?serverVersion=16&charset=utf8"
+```
+
+Sous PowerShell :
+
+```powershell
+$env:APP_ENV = "prod"
+php bin/console cache:clear --env=prod --no-debug
+php bin/console doctrine:migrations:migrate --env=prod --no-interaction
+php -S 127.0.0.1:8000 -t public public/index.php
+```
+
+Pour revenir de la production au developpement, remplacer `APP_ENV=prod` par `APP_ENV=dev` dans `.env.local`, puis relancer le serveur :
+
+```powershell
+$env:APP_ENV = "dev"
+php bin/console cache:clear --env=dev
+php -S 127.0.0.1:8000 -t public public/index.php
+```
+
+La base de donnees et les migrations restent communes aux deux environnements lorsque la meme `DATABASE_URL` est utilisee. En production, utiliser une base et des secrets distincts et ne jamais les versionner.
 
 ### Demarrer le serveur local
 
